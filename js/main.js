@@ -96,6 +96,7 @@ const reducedMotionMedia = window.matchMedia("(prefers-reduced-motion: reduce)")
 const prefersReducedMotion = () => reducedMotionMedia.matches;
 
 const randomBetween = (min, max) => min + Math.random() * (max - min);
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 function getFrameCount() {
   const isPortrait = window.innerHeight >= window.innerWidth;
@@ -152,36 +153,54 @@ function getSafeZone() {
   };
 }
 
+function getCardCenterPosition(width, height) {
+  const rect = messageCard.getBoundingClientRect();
+  const padding = window.innerWidth <= MOBILE_BREAKPOINT ? 6 : 12;
+  const maxX = Math.max(padding, window.innerWidth - width - padding);
+  const maxY = Math.max(padding, window.innerHeight - height - padding);
+  const x = rect.left + rect.width / 2 - width / 2;
+  const y = rect.top + rect.height / 2 - height / 2;
+
+  return {
+    x: clamp(x, padding, maxX),
+    y: clamp(y, padding, maxY)
+  };
+}
+
 function getRandomPosition(width, height) {
   const safeZone = getSafeZone();
   const padding = window.innerWidth <= MOBILE_BREAKPOINT ? 6 : 12;
   const maxX = Math.max(padding, window.innerWidth - width - padding);
   const maxY = Math.max(padding, window.innerHeight - height - padding);
+  const cardRect = messageCard.getBoundingClientRect();
+  const centerX = cardRect.left + cardRect.width / 2;
+  const centerY = cardRect.top + cardRect.height / 2;
+  const minRadius = Math.max(cardRect.width, cardRect.height) * 0.62;
+  const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.78;
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = randomBetween(minRadius, maxRadius);
+    const x = centerX + Math.cos(angle) * radius - width / 2;
+    const y = centerY + Math.sin(angle) * radius - height / 2;
+    const candidate = { left: x, top: y, right: x + width, bottom: y + height };
+
+    const isInBounds = x >= padding && y >= padding && x <= maxX && y <= maxY;
+    if (isInBounds && !intersects(candidate, safeZone)) {
+      return { x, y };
+    }
+  }
+
+  for (let attempt = 0; attempt < 60; attempt += 1) {
     const x = randomBetween(padding, maxX);
     const y = randomBetween(padding, maxY);
     const candidate = { left: x, top: y, right: x + width, bottom: y + height };
-
     if (!intersects(candidate, safeZone)) {
       return { x, y };
     }
   }
 
-  const side = Math.floor(Math.random() * 4);
-  if (side === 0) {
-    return { x: randomBetween(padding, maxX), y: padding };
-  }
-
-  if (side === 1) {
-    return { x: maxX, y: randomBetween(padding, maxY) };
-  }
-
-  if (side === 2) {
-    return { x: randomBetween(padding, maxX), y: maxY };
-  }
-
-  return { x: padding, y: randomBetween(padding, maxY) };
+  return getCardCenterPosition(width, height);
 }
 
 function getViewerTargetRect(aspectRatio) {
@@ -283,13 +302,13 @@ function openViewerFromPhoto(photoEl) {
 }
 
 function moveFrame(frame, options = {}) {
-  const { immediate = false, reschedule = true } = options;
+  const { immediate = false, reschedule = true, durationMs = null } = options;
   const width = frame.el.offsetWidth || 120;
   const height = frame.el.offsetHeight || Math.round(width * 1.2);
   const { x, y } = getRandomPosition(width, height);
-  const rotate = randomBetween(-12, 12).toFixed(2);
+  const rotate = randomBetween(-22, 22).toFixed(2);
 
-  const duration = immediate ? 0 : randomBetween(5600, 11000);
+  const duration = immediate ? 0 : (durationMs ?? randomBetween(5600, 11000));
   frame.el.style.setProperty("--move-duration", `${duration}ms`);
   frame.el.style.transform = `translate(${x}px, ${y}px) rotate(${rotate}deg)`;
 
@@ -306,41 +325,85 @@ function clearFrameTimers(frame) {
   clearTimeout(frame.moveTimer);
   clearTimeout(frame.imageTimer);
   clearTimeout(frame.sizeTimer);
+  clearTimeout(frame.launchTimer);
+}
+
+function launchFrameFromTitle(frame) {
+  const width = frame.el.offsetWidth || Math.round(getPhotoSize());
+  const height = frame.el.offsetHeight || Math.round(width * 1.2);
+  const origin = getCardCenterPosition(width, height);
+
+  frame.el.style.setProperty("--move-duration", "0ms");
+  frame.el.style.transform = `translate(${origin.x}px, ${origin.y}px) rotate(0deg) scale(0.82)`;
+
+  clearTimeout(frame.launchTimer);
+  const launchDelay = randomBetween(120, 900);
+  frame.launchTimer = window.setTimeout(() => {
+    moveFrame(frame, { immediate: false, durationMs: randomBetween(1500, 2800) });
+    scheduleImageSwap(frame);
+    scheduleSizeShift(frame);
+  }, launchDelay);
 }
 
 function swapPhoto(frame) {
+  if (frame.pendingImage) {
+    return;
+  }
+
   const currentPhoto = frame.el.getAttribute("src") || "";
   const nextPhoto = choosePhoto(currentPhoto);
   if (!nextPhoto) {
     return;
   }
 
-  frame.el.style.opacity = "0.24";
   const preloader = new Image();
   frame.pendingImage = preloader;
   preloader.decoding = "async";
-  preloader.onload = () => {
+  const commitSwap = () => {
     if (frame.pendingImage !== preloader) {
       return;
     }
 
     frame.el.setAttribute("src", nextPhoto);
-    frame.el.style.opacity = "1";
     frame.pendingImage = null;
   };
-  preloader.onerror = () => {
+  const clearPending = () => {
     if (frame.pendingImage !== preloader) {
       return;
     }
 
-    frame.el.style.opacity = "1";
     frame.pendingImage = null;
   };
+  preloader.onload = () => {
+    if (frame.pendingImage !== preloader) {
+      return;
+    }
+
+    if (typeof preloader.decode === "function") {
+      preloader.decode().then(commitSwap).catch(commitSwap);
+      return;
+    }
+
+    commitSwap();
+  };
+  preloader.onerror = clearPending;
   preloader.src = nextPhoto;
 }
 
+function getImageSwapDelay() {
+  if (window.innerWidth <= SMALL_MOBILE_BREAKPOINT) {
+    return randomBetween(5600, 13000);
+  }
+
+  if (window.innerWidth <= MOBILE_BREAKPOINT) {
+    return randomBetween(4200, 10200);
+  }
+
+  return randomBetween(MIN_IMAGE_SWAP_DELAY, MAX_IMAGE_SWAP_DELAY);
+}
+
 function scheduleImageSwap(frame) {
-  const waitTime = randomBetween(MIN_IMAGE_SWAP_DELAY, MAX_IMAGE_SWAP_DELAY);
+  const waitTime = getImageSwapDelay();
   clearTimeout(frame.imageTimer);
   frame.imageTimer = window.setTimeout(() => {
     swapPhoto(frame);
@@ -348,8 +411,20 @@ function scheduleImageSwap(frame) {
   }, waitTime);
 }
 
+function getSizeShiftDelay() {
+  if (window.innerWidth <= SMALL_MOBILE_BREAKPOINT) {
+    return randomBetween(5200, 14000);
+  }
+
+  if (window.innerWidth <= MOBILE_BREAKPOINT) {
+    return randomBetween(4000, 11200);
+  }
+
+  return randomBetween(MIN_SIZE_SHIFT_DELAY, MAX_SIZE_SHIFT_DELAY);
+}
+
 function scheduleSizeShift(frame) {
-  const waitTime = randomBetween(MIN_SIZE_SHIFT_DELAY, MAX_SIZE_SHIFT_DELAY);
+  const waitTime = getSizeShiftDelay();
   clearTimeout(frame.sizeTimer);
   frame.sizeTimer = window.setTimeout(() => {
     frame.el.style.width = `${Math.round(getPhotoSize())}px`;
@@ -375,6 +450,7 @@ function makeFrame(index) {
     moveTimer: 0,
     imageTimer: 0,
     sizeTimer: 0,
+    launchTimer: 0,
     pendingImage: null,
     started: false
   };
@@ -388,9 +464,7 @@ function makeFrame(index) {
 
     frame.started = true;
     img.dataset.ready = "true";
-    moveFrame(frame, { immediate: true });
-    scheduleImageSwap(frame);
-    scheduleSizeShift(frame);
+    launchFrameFromTitle(frame);
   };
 
   img.addEventListener("load", startFrame);
@@ -447,9 +521,7 @@ function resetForResize() {
     clearFrameTimers(frame);
     frame.pendingImage = null;
     frame.el.style.width = `${Math.round(getPhotoSize())}px`;
-    moveFrame(frame, { immediate: true });
-    scheduleImageSwap(frame);
-    scheduleSizeShift(frame);
+    launchFrameFromTitle(frame);
   });
 }
 

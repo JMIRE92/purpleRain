@@ -73,12 +73,14 @@ const viewerImage = document.getElementById("viewer-image");
 
 const MOBILE_BREAKPOINT = 720;
 const SMALL_MOBILE_BREAKPOINT = 480;
-const SMALL_MOBILE_FRAME_COUNT = 6;
-const MOBILE_FRAME_COUNT = 9;
+const SMALL_MOBILE_FRAME_COUNT = 8;
+const SMALL_MOBILE_PORTRAIT_FRAME_COUNT = 11;
+const MOBILE_FRAME_COUNT = 11;
+const MOBILE_PORTRAIT_FRAME_COUNT = 14;
 const DESKTOP_FRAME_COUNT = 16;
 
-const MIN_SIZE_MOBILE = 78;
-const MAX_SIZE_MOBILE = 120;
+const MIN_SIZE_MOBILE = 68;
+const MAX_SIZE_MOBILE = 108;
 const MIN_SIZE_DESKTOP = 108;
 const MAX_SIZE_DESKTOP = 188;
 const MIN_IMAGE_SWAP_DELAY = 1800;
@@ -96,11 +98,17 @@ const prefersReducedMotion = () => reducedMotionMedia.matches;
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 function getFrameCount() {
+  const isPortrait = window.innerHeight >= window.innerWidth;
+
   if (window.innerWidth <= SMALL_MOBILE_BREAKPOINT) {
-    return SMALL_MOBILE_FRAME_COUNT;
+    return isPortrait ? SMALL_MOBILE_PORTRAIT_FRAME_COUNT : SMALL_MOBILE_FRAME_COUNT;
   }
 
-  return window.innerWidth <= MOBILE_BREAKPOINT ? MOBILE_FRAME_COUNT : DESKTOP_FRAME_COUNT;
+  if (window.innerWidth <= MOBILE_BREAKPOINT) {
+    return isPortrait ? MOBILE_PORTRAIT_FRAME_COUNT : MOBILE_FRAME_COUNT;
+  }
+
+  return DESKTOP_FRAME_COUNT;
 }
 
 function getPhotoSize() {

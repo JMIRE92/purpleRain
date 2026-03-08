@@ -1,0 +1,248 @@
+:root {
+  --bg-start: #fff6ec;
+  --bg-mid: #ffe0e5;
+  --bg-end: #eaf7f1;
+  --accent: #d23e6e;
+  --text-main: #2a2532;
+  --text-soft: #5f5868;
+  --card-bg: rgba(255, 255, 255, 0.84);
+  --card-border: rgba(255, 255, 255, 0.62);
+  --photo-border: rgba(255, 255, 255, 0.92);
+  --photo-shadow: 0 18px 30px rgba(28, 12, 32, 0.26);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100svh;
+  overflow: hidden;
+  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+  color: var(--text-main);
+  background: linear-gradient(140deg, var(--bg-start), var(--bg-mid) 42%, var(--bg-end));
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.7;
+}
+
+.glow-1 {
+  width: min(44vw, 460px);
+  aspect-ratio: 1;
+  top: -8%;
+  left: -8%;
+  background: rgba(250, 180, 116, 0.62);
+}
+
+.glow-2 {
+  width: min(36vw, 390px);
+  aspect-ratio: 1;
+  bottom: -12%;
+  right: 4%;
+  background: rgba(255, 144, 173, 0.58);
+}
+
+.glow-3 {
+  width: min(34vw, 370px);
+  aspect-ratio: 1;
+  top: 18%;
+  right: -8%;
+  background: rgba(121, 204, 173, 0.5);
+}
+
+.photo-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.floating-photo {
+  --move-duration: 8000ms;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 150px;
+  border-radius: 16px;
+  border: 5px solid var(--photo-border);
+  box-shadow: var(--photo-shadow);
+  transform: translate(-1000px, -1000px) rotate(0deg);
+  transition:
+    transform var(--move-duration) cubic-bezier(0.45, 0, 0.14, 1),
+    width 1100ms ease,
+    opacity 230ms ease;
+  will-change: transform;
+  object-fit: cover;
+  pointer-events: auto;
+  cursor: zoom-in;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.message-card {
+  position: relative;
+  z-index: 20;
+  width: min(92vw, 740px);
+  padding: clamp(1.8rem, 2.6vw, 2.8rem);
+  border-radius: 26px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 24px 50px rgba(43, 24, 51, 0.18);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.tag {
+  margin: 0 auto;
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(210, 62, 110, 0.12);
+  border: 1px solid rgba(210, 62, 110, 0.26);
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  font-size: clamp(0.72rem, 1.8vw, 0.9rem);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0.75rem 0 0;
+  font-size: clamp(1.85rem, 5vw, 3.5rem);
+  line-height: 1.1;
+  font-family: "Georgia", "Times New Roman", serif;
+  color: var(--text-main);
+  text-wrap: balance;
+}
+
+h1::selection,
+.tag::selection {
+  background: rgba(210, 62, 110, 0.22);
+}
+
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(25, 13, 31, 0.72);
+  backdrop-filter: blur(4px);
+  transition: opacity 320ms ease;
+}
+
+.photo-viewer.is-active,
+.photo-viewer.is-closing {
+  pointer-events: auto;
+}
+
+.photo-viewer.is-active {
+  opacity: 1;
+}
+
+.photo-viewer.is-closing {
+  opacity: 0;
+}
+
+.viewer-image {
+  --start-x: 0px;
+  --start-y: 0px;
+  --start-scale: 0.3;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 160px;
+  height: 160px;
+  opacity: 0;
+  border-radius: 20px;
+  border: 6px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 24px 48px rgba(15, 6, 21, 0.45);
+  object-fit: cover;
+  will-change: transform, opacity;
+  transform: translate(var(--start-x), var(--start-y)) scale(var(--start-scale));
+  transition:
+    transform 520ms cubic-bezier(0.22, 0.85, 0.25, 1),
+    opacity 260ms ease;
+}
+
+.photo-viewer.is-active .viewer-image {
+  opacity: 1;
+  transform: translate(0, 0) scale(1);
+}
+
+.photo-viewer.is-closing .viewer-image {
+  opacity: 0;
+  transform: translate(0, 0) scale(0.92);
+}
+
+@media (max-width: 720px) {
+  .message-card {
+    width: min(94vw, 620px);
+    padding: 1.35rem 1.2rem 1.4rem;
+    border-radius: 20px;
+  }
+
+  .floating-photo {
+    border-width: 4px;
+    border-radius: 12px;
+  }
+
+  .viewer-image {
+    border-width: 4px;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: clamp(1.5rem, 7.5vw, 2.15rem);
+    line-height: 1.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-photo {
+    transition: none;
+    transform: translate(-1000px, -1000px);
+  }
+
+  .photo-viewer,
+  .viewer-image {
+    transition: none;
+  }
+}
